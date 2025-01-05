@@ -39,6 +39,7 @@ def setup(hass, config):
 
     hass.data[DOMAIN] = {
         'api': NestAPI(
+            hass,
             user_id,
             access_token,
             issue_token,

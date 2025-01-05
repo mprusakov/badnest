@@ -2,8 +2,18 @@ import logging
 
 import requests
 import simplejson
+import re
 
 from time import sleep
+from pathlib import Path
+
+from .const import (
+    DOMAIN
+)
+
+from homeassistant.helpers.storage import (
+    STORAGE_DIR
+)
 
 API_URL = "https://home.nest.com"
 CAMERA_WEBAPI_BASE = "https://webapi.camera.home.nest.com"
@@ -14,6 +24,8 @@ URL_JWT = "https://nestauthproxyservice-pa.googleapis.com/v1/issue_jwt"
 
 # Nest website's (public) API key
 NEST_API_KEY = "AIzaSyAdkSIMNc51XGNEAYWasX9UOWkS5P6sZE4"
+
+STORAGE_KEY = f"{DOMAIN}-token"
 
 KNOWN_BUCKET_TYPES = [
     # Thermostats
@@ -31,7 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class NestAPI():
-    def __init__(self, user_id, access_token, issue_token, cookie, region):
+    def __init__(self, hass, user_id, access_token, issue_token, cookie, region):
+        self.path = Path(hass.config.path(STORAGE_DIR, STORAGE_KEY))
         """Badnest Google Nest API interface."""
         self.device_data = {}
         self._wheres = {}
@@ -78,6 +91,16 @@ class NestAPI():
         self._login_dropcam()
 
     def _login_google(self, issue_token, cookie):
+        if self.path.exists():
+            stored = self.path.read_text()
+            if stored:
+                _LOGGER.info(f"found a stored cookie={stored}")
+                key = stored.split('=', 1)[0] + '='
+                if key in cookie:
+                    cookie = re.sub(rf"{key}[^;]+", stored, cookie)
+                else:
+                    cookie += f"; {stored}"
+                _LOGGER.info(f"using cookie={cookie}")
         headers = {
             'User-Agent': USER_AGENT,
             'Sec-Fetch-Mode': 'cors',
@@ -86,7 +109,11 @@ class NestAPI():
             'cookie': cookie
         }
         r = self._session.get(url=issue_token, headers=headers)
-        access_token = r.json()['access_token']
+        if "error" in r.json():
+            self.path.write_text('')
+            raise ValueError(r.text)
+        access_token = r.json()["access_token"]
+        self.path.write_text(r.headers['Set-Cookie'].split(";",1)[0])
 
         headers = {
             'User-Agent': USER_AGENT,
