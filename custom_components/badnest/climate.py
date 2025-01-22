@@ -1,6 +1,7 @@
 """Demo platform that offers a fake climate device."""
 from datetime import datetime
 import logging
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
 try:
     from homeassistant.components.climate import ClimateEntity
@@ -130,7 +131,10 @@ class NestClimate(ClimateEntity):
     @property
     def should_poll(self):
         """Return the polling state."""
-        return True
+        return False
+
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
 
     @property
     def temperature_unit(self):
@@ -313,7 +317,3 @@ class NestClimate(ClimateEntity):
                 self.device_id,
                 need_eco,
             )
-
-    def update(self):
-        """Updates data."""
-        self.device.update()

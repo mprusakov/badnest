@@ -14,6 +14,8 @@ from .const import (
     DOMAIN
 )
 
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
 SUPPORT_CHIME = 4
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,7 +62,7 @@ class NestCamera(Camera):
 
     @property
     def should_poll(self):
-        return True
+        return False
 
     @property
     def unique_id(self):
@@ -112,9 +114,8 @@ class NestCamera(Camera):
         """Return if camera supports doorbell chime."""
         return self._device.device_data[self._uuid]['indoor_chime']
 
-    def update(self):
-        """Cache value from Python-nest."""
-        self._device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
 
     @property
     def name(self):

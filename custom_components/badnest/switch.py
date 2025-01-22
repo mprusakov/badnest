@@ -4,7 +4,7 @@ from .const import DOMAIN
 from homeassistant.components.switch import (
     SwitchDeviceClass,
 )
-
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 try:
     from homeassistant.components.switch import SwitchEntity
 except ImportError:
@@ -84,6 +84,9 @@ class ChimeSwitch(SwitchEntity):
         """Return the class of this device, from component DEVICE_CLASSES."""
         return SwitchDeviceClass.SWITCH
 
-    def update(self):
-        """Get the latest data for the Switch and updates the states."""
-        self.device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
+
+    @property
+    def should_poll(self):
+        return False

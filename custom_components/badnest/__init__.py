@@ -1,4 +1,5 @@
 """The example integration."""
+import asyncio
 import voluptuous as vol
 from homeassistant.helpers import config_validation as cv
 
@@ -24,7 +25,7 @@ CONFIG_SCHEMA = vol.Schema(
 )
 
 
-def setup(hass, config):
+async def async_setup(hass, config):
     """Set up the badnest component."""
     if config.get(DOMAIN) is not None:
         user_id = config[DOMAIN].get(CONF_USER_ID)
@@ -37,14 +38,10 @@ def setup(hass, config):
         cookie = None
         region = None
 
-    hass.data[DOMAIN] = {
-        'api': NestAPI(
-            user_id,
-            access_token,
-            issue_token,
-            cookie,
-            region,
-        ),
-    }
+    api = NestAPI(hass, user_id, access_token, issue_token, cookie, region)
+
+    hass.data[DOMAIN] = {"api": api}
+    pl = await hass.async_add_executor_job(api.init)
+    api.subscribe(pl)
 
     return True

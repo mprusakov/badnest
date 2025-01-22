@@ -13,6 +13,8 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
 )
 
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
 _LOGGER = logging.getLogger(__name__)
 
 PROTECT_SENSOR_TYPES = [
@@ -91,9 +93,12 @@ class NestTemperatureSensor(Entity):
         """Return the unit of measurement of this entity, if any."""
         return self._unit_of_measurement
 
-    def update(self):
-        """Get the latest data from the DHT and updates the states."""
-        self.device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
+
+    @property
+    def should_poll(self):
+        return False
 
     @property
     def device_state_attributes(self):
@@ -141,9 +146,12 @@ class NestWaterTemperatureSensor(Entity):
         """Return the unit of measurement of this entity, if any."""
         return self._unit_of_measurement
 
-    def update(self):
-        """Get the latest data from the DHT and updates the states."""
-        self.device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
+
+    @property
+    def should_poll(self):
+        return False
 
     @property
     def device_state_attributes(self):
@@ -182,6 +190,9 @@ class NestProtectSensor(Entity):
         """Return the state of the sensor."""
         return self.device.device_data[self.device_id][self._sensor_type]
 
-    def update(self):
-        """Get the latest data from the Protect and updates the states."""
-        self.device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
+
+    @property
+    def should_poll(self):
+        return False

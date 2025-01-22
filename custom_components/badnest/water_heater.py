@@ -30,6 +30,8 @@ from .const import (
     DOMAIN,
 )
 
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
 STATE_SCHEDULE = 'schedule'
 SERVICE_BOOST_HOT_WATER = 'boost_hot_water'
 SUPPORT_BOOST_MODE = 8
@@ -289,9 +291,12 @@ class NestWaterHeater(WaterHeaterEntity):
         if self.device.device_data[self.device_id]['has_hot_water_control']:
             self.device.hotwater_set_boost(self.device_id, time=0)
 
-    def update(self):
-        """Get the latest data from the Hot Water Sensor and updates the states."""
-        self.device.update()
+    async def async_added_to_hass(self) -> None:
+        async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
+
+    @property
+    def should_poll(self):
+        return False
 
     def set_temperature(self, **kwargs):
         """Set new target temperature."""
