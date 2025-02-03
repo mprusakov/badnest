@@ -4,6 +4,6 @@
   "documentation": "https://custom-components.github.io/badnest",
   "dependencies": [],
   "requirements": ["simplejson>=3.17.2"],
-  "version": "5.1.1",
+  "version": "5.1.2",
   "iot_class": "cloud_push"
 }
