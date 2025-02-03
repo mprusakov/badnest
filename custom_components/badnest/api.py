@@ -85,7 +85,7 @@ class NestAPI:
             _LOGGER.debug(f"sending {pl}")
             async with self._async_session.post(
                 f"{self._transport_url}/v5/subscribe",
-                timeout=ClientTimeout(total=90),
+                timeout=ClientTimeout(total=90*60),
                 json=pl,
                 headers={"Authorization": f"Basic {self._access_token}"},
             ) as response:
