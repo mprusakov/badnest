@@ -14,7 +14,10 @@ from .const import DOMAIN
 from homeassistant.helpers.storage import STORAGE_DIR
 
 from aiohttp import ClientSession, ClientTimeout, ContentTypeError, FormData
+
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from http import cookies
+import datetime
 
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 API_URL = "https://home.nest.com"
@@ -91,7 +94,7 @@ class NestAPI:
             ) as response:
                 t = await response.text()
                 _LOGGER.debug(f"received {t}, {response.status}")
-                if response.status == 401:
+                if response.status in (400, 401):
                     await self._hass.async_add_executor_job(self.login)
                 elif t:
                     r = await response.json()
@@ -285,6 +288,33 @@ class NestAPI:
         else:
             return "Unknown"
 
+    def _milli_volt_to_percentage(cls, state: int):
+        """
+        Convert battery level in mV to a percentage.
+
+        The battery life percentage in devices is estimated using slopes from the L91 battery's datasheet.
+        This is a rough estimation, and the battery life percentage is not linear.
+
+        Tests on various devices have shown accurate results.
+        """
+        if 3000 < state <= 6000:
+            if 4950 < state <= 6000:
+                slope = 0.001816609
+                yint = -8.548096886
+            elif 4800 < state <= 4950:
+                slope = 0.000291667
+                yint = -0.991176471
+            elif 4500 < state <= 4800:
+                slope = 0.001077342
+                yint = -4.730392157
+            else:
+                slope = 0.000434641
+                yint = -1.825490196
+
+            return max(0, min(100, round(((slope * state) + yint) * 100)))
+
+        return None
+
     def parse_buckets(self, buckets):
         for bucket in buckets:
             sensor_data = bucket["value"]
@@ -404,6 +434,18 @@ class NestAPI:
                 self.device_data[sn]["battery_health_state"] = (
                     self._map_nest_protect_state(sensor_data["battery_health_state"])
                 )
+                self.device_data[sn]["heat_status"] = self._map_nest_protect_state(
+                    sensor_data["heat_status"]
+                )
+                self.device_data[sn]["battery_level"] = (
+                    self._milli_volt_to_percentage(sensor_data["battery_level"])
+                )
+                self.device_data[sn]["replace_by_date_utc_secs"] = (
+                     datetime.datetime.utcfromtimestamp(sensor_data["replace_by_date_utc_secs"])
+                )
+                self.device_data[sn]["auto_away"] = "Out" if sensor_data["auto_away"] else "In"
+                self.device_data[sn]["line_power_present"] = "Online" if sensor_data["line_power_present"] else "Offline"
+                self.device_data[sn]["wired_or_battery"] = sensor_data["wired_or_battery"]
             # Temperature sensors
             elif bucket["object_key"].startswith(f"kryptonite.{sn}"):
                 self.device_data[sn]["name"] = self._wheres[sensor_data["where_id"]]

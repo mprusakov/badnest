@@ -6,22 +6,63 @@ from .const import DOMAIN
 
 from homeassistant.const import (
     ATTR_BATTERY_LEVEL,
-    UnitOfTemperature
+    UnitOfTemperature,
+    PERCENTAGE,
 )
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
 )
 
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity import EntityCategory
 
 _LOGGER = logging.getLogger(__name__)
 
-PROTECT_SENSOR_TYPES = [
-    "co_status",
-    "smoke_status",
-    "battery_health_state"
-]
+PROTECT_SENSOR_TYPES: list[SensorEntityDescription] = [
+    SensorEntityDescription(
+        key="co_status",
+        name="CO Status",
+        options=["Ok", "Warning", "Emergency", "Unknown"]
+    ),
+    SensorEntityDescription(
+        key="smoke_status",
+        name="Smoke Status",
+        options=["Ok", "Warning", "Emergency", "Unknown"]),
+    SensorEntityDescription(
+        key="heat_status",
+        name="Heat Status",
+        options=["Ok", "Warning", "Emergency", "Unknown"]),
+    SensorEntityDescription(
+        key="battery_health_state",
+        name="Battery Health",
+        options=["Ok", "Warning", "Emergency", "Unknown"]),
+    SensorEntityDescription(
+        key="battery_level",
+        name="Battery Level",
+        device_class=SensorDeviceClass.BATTERY,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT),
+    SensorEntityDescription(
+        key="replace_by_date_utc_secs",
+        name="Replace By",
+        device_class=SensorDeviceClass.DATE
+    )]
+
+PROTECT_SENSOR_WIRED_TYPES: list[SensorEntityDescription] = [
+    SensorEntityDescription(
+        key="auto_away",
+        name="Occupancy",
+        options=["In", "Out"]
+    ),
+    SensorEntityDescription(
+        key="line_power_present",
+        name="Line Power",
+        options=["Online", "Offline"]
+    )]
 
 
 async def async_setup_platform(hass,
@@ -53,6 +94,9 @@ async def async_setup_platform(hass,
         _LOGGER.info(f"Adding nest protect sensor uuid: {sensor}")
         for sensor_type in PROTECT_SENSOR_TYPES:
             protect_sensors.append(NestProtectSensor(sensor, sensor_type, api))
+        if not api.device_data[sensor]['wired_or_battery']:
+            for sensor_type in PROTECT_SENSOR_WIRED_TYPES:
+                protect_sensors.append(NestProtectSensor(sensor, sensor_type, api))
 
     async_add_entities(protect_sensors)
 
@@ -163,32 +207,32 @@ class NestWaterTemperatureSensor(Entity):
 
 
 
-class NestProtectSensor(Entity):
+class NestProtectSensor(SensorEntity):
 
     """Implementation of the Nest Protect sensor."""
 
-    def __init__(self, device_id, sensor_type, api):
+    def __init__(self, device_id, entity_description, api):
         """Initialize the sensor."""
         self._name = "Nest Protect Sensor"
         self.device_id = device_id
-        self._sensor_type = sensor_type
+        self.entity_description = entity_description
         self.device = api
 
     @property
     def unique_id(self):
         """Return an unique ID."""
-        return self.device_id + '_' + self._sensor_type
+        return self.device_id + '_' + self.entity_description.key
 
     @property
     def name(self):
         """Return the name of the sensor."""
         return self.device.device_data[self.device_id]['name'] + \
-            f' {self._sensor_type}'
+            f' {self.entity_description.name}'
 
     @property
     def state(self):
         """Return the state of the sensor."""
-        return self.device.device_data[self.device_id][self._sensor_type]
+        return self.device.device_data[self.device_id][self.entity_description.key]
 
     async def async_added_to_hass(self) -> None:
         async_dispatcher_connect(self.hass, DOMAIN, lambda a :self.schedule_update_ha_state(False))
